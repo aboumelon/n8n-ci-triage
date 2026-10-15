@@ -1,0 +1,167 @@
+{
+  "test": {
+    "payload": {
+      "action": "completed",
+      "repository": {
+        "full_name": "demo/ci-sandbox"
+      },
+      "workflow_run": {
+        "id": 1001,
+        "run_attempt": 1,
+        "run_number": 1,
+        "workflow_id": 42,
+        "name": "Python CI",
+        "head_branch": "main",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    },
+    "jobs": [
+      {
+        "id": 10010,
+        "name": "backend-tests",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Run pytest",
+            "conclusion": "failure"
+          }
+        ],
+        "log": "FAILED tests/test_math.py::test_total - AssertionError: expected 5, got 4\n"
+      }
+    ]
+  },
+  "dependency": {
+    "payload": {
+      "action": "completed",
+      "repository": {
+        "full_name": "demo/ci-sandbox"
+      },
+      "workflow_run": {
+        "id": 1002,
+        "run_attempt": 1,
+        "run_number": 2,
+        "workflow_id": 42,
+        "name": "Python CI",
+        "head_branch": "main",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    },
+    "jobs": [
+      {
+        "id": 10020,
+        "name": "backend-tests",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Run pytest",
+            "conclusion": "failure"
+          }
+        ],
+        "log": "ModuleNotFoundError: No module named 'httpx'\n"
+      }
+    ]
+  },
+  "lint": {
+    "payload": {
+      "action": "completed",
+      "repository": {
+        "full_name": "demo/ci-sandbox"
+      },
+      "workflow_run": {
+        "id": 1003,
+        "run_attempt": 1,
+        "run_number": 3,
+        "workflow_id": 42,
+        "name": "Python CI",
+        "head_branch": "main",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    },
+    "jobs": [
+      {
+        "id": 10030,
+        "name": "lint",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Run Ruff",
+            "conclusion": "failure"
+          }
+        ],
+        "log": "src/app.py:12:1: F401 `os` imported but unused\n"
+      }
+    ]
+  },
+  "repeat-dependency": {
+    "payload": {
+      "action": "completed",
+      "repository": {
+        "full_name": "demo/ci-sandbox"
+      },
+      "workflow_run": {
+        "id": 1004,
+        "run_attempt": 1,
+        "run_number": 4,
+        "workflow_id": 42,
+        "name": "Python CI",
+        "head_branch": "main",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    },
+    "jobs": [
+      {
+        "id": 10040,
+        "name": "backend-tests",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Run pytest",
+            "conclusion": "failure"
+          }
+        ],
+        "log": "ModuleNotFoundError: No module named 'httpx'\n"
+      }
+    ]
+  },
+  "success": {
+    "payload": {
+      "action": "completed",
+      "repository": {
+        "full_name": "demo/ci-sandbox"
+      },
+      "workflow_run": {
+        "id": 1005,
+        "run_attempt": 1,
+        "run_number": 5,
+        "workflow_id": 42,
+        "name": "Python CI",
+        "head_branch": "main",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    },
+    "jobs": [
+      {
+        "id": 10050,
+        "name": "backend-tests",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Run pytest",
+            "conclusion": "success"
+          }
+        ],
+        "log": "All checks passed.\n"
+      }
+    ]
+  }
+}

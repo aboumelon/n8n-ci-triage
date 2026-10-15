@@ -1,0 +1,11 @@
+{
+  "name": "ci-triage-freestyle-deployment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "provision": "node provision.mjs"
+  },
+  "dependencies": {
+    "freestyle": "0.2.20"
+  }
+}

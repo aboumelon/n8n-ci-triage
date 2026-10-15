@@ -1,0 +1,362 @@
+{
+  "id": "ciTriageWorkflowV1",
+  "name": "CI Triage",
+  "active": false,
+  "nodes": [
+    {
+      "id": "81c760ea-66bf-5077-b333-38152f831cc6",
+      "name": "Queue wake-up",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ci-triage",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 202,
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "webhookId": "f6f9f366-4671-5278-b2dc-6766a9ac9ad2"
+    },
+    {
+      "id": "435485af-b640-5bd4-ba75-88072c201e1d",
+      "name": "Recover pending runs",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b29d64c5-6bed-5b68-89aa-70ed82efd2d9",
+      "name": "Manual demo",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        500
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "95268843-8ae2-52bd-b6d3-e380b24c3527",
+      "name": "Claim run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://triage:8000/internal/claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "9a79c667-e601-5b2d-8cfe-47448f45aeab",
+      "name": "Run available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1e849b4-6860-5db4-addb-222265cea4e6",
+              "leftValue": "={{ $json.has_work }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0f997d80-a252-50f9-a721-162378082329",
+      "name": "Analyze evidence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://triage:8000/internal/analyze",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_key: $json.run_key, lease_token: $json.lease_token }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "2faf302c-b7f1-5c1c-b7ba-3e6004ff8af1",
+      "name": "Publish or save draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://triage:8000/internal/publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_key: $json.run_key, lease_token: $json.lease_token }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "b2bf1949-612b-5992-8584-976232ab746e",
+      "name": "Telegram or save draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1220,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://triage:8000/internal/notify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_key: $json.run_key, lease_token: $json.lease_token }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "272975ba-6fc6-581e-a805-ca82f18f2cb3",
+      "name": "Acknowledge run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://triage:8000/internal/complete",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_key: $json.run_key, lease_token: $json.lease_token }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Queue wake-up": {
+      "main": [
+        [
+          {
+            "node": "Claim run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover pending runs": {
+      "main": [
+        [
+          {
+            "node": "Claim run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual demo": {
+      "main": [
+        [
+          {
+            "node": "Claim run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim run": {
+      "main": [
+        [
+          {
+            "node": "Run available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run available?": {
+      "main": [
+        [
+          {
+            "node": "Analyze evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze evidence": {
+      "main": [
+        [
+          {
+            "node": "Publish or save draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish or save draft": {
+      "main": [
+        [
+          {
+            "node": "Telegram or save draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram or save draft": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge run": {
+      "main": [
+        [
+          {
+            "node": "Claim run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Tehran",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "executionTimeout": 3600
+  },
+  "pinData": {},
+  "tags": []
+}
