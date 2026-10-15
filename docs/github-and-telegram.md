@@ -65,11 +65,23 @@ only for tracked, older incidents of that exact repository, workflow, and branch
 ## Telegram
 
 1. Create a bot with [BotFather](https://t.me/BotFather).
-2. Start a private conversation with the bot, or add it to the destination group.
-3. Determine the destination `chat_id` using Telegram's `getUpdates` method after sending
-   a message. A group ID may be negative. Avoid publishing the response or token.
-4. Set both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in the server's private `.env`.
-5. Restart `triage` and trigger a new CI run.
+2. Run `python3 scripts/configure_telegram.py --send-test` in an interactive VM terminal.
+   Enter the bot token at the hidden prompt. The script displays the bot's username
+   and a one-time setup code. Send that exact code in your private chat with the bot,
+   then return to the terminal and press Enter. The bot does not need to reply to
+   `/start` or the setup code.
+3. The script matches the code to its private chat, sends a connection confirmation,
+   and saves `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env` with mode `0600`.
+   Other settings are preserved. Unrelated chats are ignored; failed pairing or a
+   rejected test message leaves `.env` unchanged. No webhook or queued update is deleted.
+4. Run `docker compose up -d --no-deps --force-recreate --wait triage`, then trigger a
+   new CI run to verify the full notification workflow.
+
+For a group destination, obtain its `chat_id` using Telegram's `getUpdates` method
+after sending a message in the group. A group ID may be negative. Set both Telegram
+values in the server's private `.env` and recreate `triage`. Avoid publishing API
+responses or the bot token. Private-chat pairing requires access to `getUpdates`,
+so use a dedicated bot if an existing bot already has a webhook or another update reader.
 
 The bot only sends outbound `sendMessage` requests. No Telegram webhook or inbound bot
 server is required. Messages are plain text, bounded to 3,800 characters, and include
