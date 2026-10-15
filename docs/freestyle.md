@@ -109,6 +109,33 @@ curl --fail http://127.0.0.1:5678/healthz
 4. Send `python3 scripts/send_demo.py dependency` from the VM terminal.
 5. Inspect the n8n execution and `python3 scripts/inspect_runs.py`.
 
+To publish from the terminal after import, disable stdin forwarding explicitly:
+
+```bash
+sudo docker compose exec -T --interactive=false -u node n8n \
+  n8n publish:workflow --id=ciTriageWorkflowV1
+sudo docker compose restart n8n
+```
+
+`-T` disables the terminal allocation but does not disable interactive stdin. Without
+`--interactive=false`, an exec command inside a shell heredoc can consume the remaining
+deployment commands. Keep stdin enabled for the bootstrap importer, which deliberately
+sends its credential and workflow JSON over a separate subprocess input pipe.
+
+After publication and restart, verify the public gateway and orchestration:
+
+```bash
+python3 scripts/check_deployment.py --gateway-url https://ci-armin-hooks.style.dev
+```
+
+The check waits for local readiness, submits a signed dependency failure through the
+chosen gateway, and waits for n8n to finish. It accepts only a completed dependency
+report with GitHub and Telegram drafts. On a repeated demo, `SAVED REPORT` identifies
+the existing result; `PASS` is reserved for a newly queued run that completed. Use an
+unused demo scenario from `scripts/send_demo.py` for another new execution. The
+internal API key is sent only to the local triage API. This is intended for demo/draft
+mode with Telegram delivery disabled, not an instance configured for live delivery.
+
 For a real GitHub run, follow [github-and-telegram.md](github-and-telegram.md). The GitHub
 webhook URL is `https://ci-armin-hooks.style.dev/webhooks/github`.
 

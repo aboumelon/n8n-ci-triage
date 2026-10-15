@@ -34,6 +34,13 @@ The only workflow change for this host-based check was replacing the Compose hos
 `triage:8000` with the test server's loopback address. No node logic or expressions were
 changed. Both services used temporary SQLite databases for this check.
 
+The `scripts/check_deployment.py` verifier was also run against these real services
+using loopback URLs. Its first invocation verified a newly queued dependency run;
+the second identified the duplicate as a saved report instead of claiming a new
+execution. All five fixture scenarios subsequently completed. Separate checks
+confirmed that the verifier refuses live GitHub or enabled Telegram delivery before
+sending a demo. Public Freestyle HTTPS still requires the target-VM check.
+
 | Scenario | Classification | Final run state |
 |---|---|---|
 | Test failure | `test` | `done` |
