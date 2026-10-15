@@ -41,6 +41,11 @@ execution. All five fixture scenarios subsequently completed. Separate checks
 confirmed that the verifier refuses live GitHub or enabled Telegram delivery before
 sending a demo. Public Freestyle HTTPS still requires the target-VM check.
 
+The deployment verifier also has regression tests using an HTTP server that resets
+its TCP connection. Readiness recovers, a webhook retry preserves the same delivery
+and body after an ambiguous response, and HTTP 401 is not retried. Local checks now
+pass with 39 tests and the PostgreSQL-only test skipped locally.
+
 | Scenario | Classification | Final run state |
 |---|---|---|
 | Test failure | `test` | `done` |

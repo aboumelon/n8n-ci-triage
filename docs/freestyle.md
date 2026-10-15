@@ -136,6 +136,13 @@ unused demo scenario from `scripts/send_demo.py` for another new execution. The
 internal API key is sent only to the local triage API. This is intended for demo/draft
 mode with Telegram delivery disabled, not an instance configured for live delivery.
 
+Numbered stages identify local n8n readiness, the local triage API, gateway health,
+signed webhook delivery, and the saved report. Startup resets and transient network
+errors are retried within the configured timeout. Webhook retries preserve the
+delivery ID, body, and signature. Persistent failures report the failing stage;
+authentication failures stop immediately. Use `docker compose ps` and the last printed
+stage when investigating a failure before restarting services again.
+
 For a real GitHub run, follow [github-and-telegram.md](github-and-telegram.md). The GitHub
 webhook URL is `https://ci-armin-hooks.style.dev/webhooks/github`.
 
