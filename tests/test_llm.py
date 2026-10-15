@@ -123,7 +123,7 @@ def test_no_external_call_when_disabled_or_no_failure_evidence(settings, report,
     assert result["status"] == ("disabled" if scenario == "disabled" else "skipped")
 
 
-@pytest.mark.parametrize("status", [401, 429, 500, 302])
+@pytest.mark.parametrize("status", [401, 402, 429, 500, 302])
 def test_provider_errors_are_safe_and_do_not_retry_or_switch_models(enabled, report, status):
     calls = []
 

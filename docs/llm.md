@@ -54,6 +54,32 @@ without displaying response bodies or secrets. A persistent web denial needs
 provider-side review of the VM's access; an API authentication error needs review
 of the key and account permissions.
 
+If a completed triage report has `llm.status=fallback` and `http_status=402`,
+the workflow reached the provider but its request was refused. Apinex documents
+402 as insufficient spendable balance or API-key allowance for the request's
+temporary token reservation. A free alias appearing in `/models` does not establish
+that the account or key has usable allowance for inference.
+
+Run a single small diagnostic request, using the key already saved in `.env`:
+
+```bash
+python3 scripts/check_llm.py
+```
+
+This sends only `Reply only OK.` with a 32-token output limit to the configured
+`free/` alias. It sends no CI data, performs no retries or model switches, changes
+no settings, and prints only status and recognized error codes. The request may use
+a small amount of the provider's free allowance. It never prints the API key, raw
+error messages, reasoning, or model-generated text.
+
+If this small request also gets 402, review the account's remaining free allowance
+and this API key's spending limit, or ask provider support about free-model access.
+Changing n8n or repeating CI scenarios cannot resolve that allowance refusal.
+If the small request is accepted, check the larger request's reservation limit;
+reducing `LLM_MAX_OUTPUT_TOKENS` may help but can also truncate the required JSON.
+An accepted probe is not proof that a complete triage explanation will validate.
+After resolving access, run a new CI scenario because published reports are cached.
+
 The helper only accepts `free/` aliases. Direct configuration supports other
 OpenAI-compatible providers with these settings:
 
@@ -162,3 +188,4 @@ authenticated acceptance run; see [validation.md](validation.md).
 Provider references: [Chat Completions](https://apinex.bond/developers/models/chat),
 [model catalog](https://apinex.bond/developers/models), and
 [public pricing](https://apinex.bond/pricing), reviewed on 2026-10-15.
+See also [provider errors and limits](https://apinex.bond/developers/errors).

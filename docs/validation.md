@@ -7,7 +7,7 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - `uv sync --locked`: dependency installation succeeded.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest`: 94 passed; 2 PostgreSQL integration tests skipped locally.
+- `uv run pytest`: 103 passed; 2 PostgreSQL integration tests skipped locally.
 - `uv build`: source distribution and wheel built successfully.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
@@ -169,6 +169,14 @@ exact model selection, and redirect refusal. An additional PostgreSQL test exerc
 concurrent enrichment; it runs in GitHub CI when `TEST_DATABASE_URL` is provided.
 
 These are implementation and orchestration checks with a simulated provider.
-Apinex inference, account quota, response quality, and live AI-enriched Issue/Telegram
-delivery have not been verified. The operator must configure a key and run a new
-controlled failure using [the LLM setup guide](llm.md).
+Successful Apinex inference, response quality, and live AI-enriched Issue/Telegram
+delivery have not been verified. They require a new controlled failure after
+resolving provider access using [the LLM setup guide](llm.md).
+
+For live run `38768577720`, the operator supplied a saved report showing
+`status=done`, model `free/deepseek-v4.1-flash`, and `llm.status=fallback` with
+`reason=provider_http_error`, HTTP 402, and latency 1,226 ms. The operator also
+supplied the ordinary Telegram failure notification, and the matching
+[Issue occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6196922539)
+was read back from GitHub. This verifies that a live model-provider refusal did not
+block the report; it does not establish successful model generation.
