@@ -237,3 +237,29 @@ read from the VM, so the configured AMD model identity is based on the setup flo
 This one missing-dependency example is not an explanation-quality benchmark or an
 availability guarantee. The advice is generic and does not establish that the
 dependency should actually be added; this demo intentionally imports a missing module.
+
+### Live lint explanation and recovery
+
+The operator then ran the lint scenario, [run 38785517311](https://github.com/aboumelon/n8n-ci-triage/actions/runs/38785517311/attempts/1),
+followed by [successful run 38785628725](https://github.com/aboumelon/n8n-ci-triage/actions/runs/38785628725/attempts/1).
+They supplied both Telegram notifications. The corresponding GitHub Issue and
+recovery comments were independently read back through the API on 2026-10-15:
+
+- [Issue 4](https://github.com/aboumelon/n8n-ci-triage/issues/4) identifies category
+  `lint`, rule `F401`, and the unused `os` import in `.local/lint_demo.py`. Its AI
+  section explains the unused import and suggests removing it and rerunning lint.
+  This creates a distinct incident, fingerprint `3cc09dcff0bf7b53b3b1c5b96936a4e5`,
+  rather than conflating it with the dependency incident.
+- The successful run produced recovery comments for both the
+  [dependency incident](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6199312454)
+  and [lint incident](https://github.com/aboumelon/n8n-ci-triage/issues/4#issuecomment-6199312869)
+  on the same workflow and branch. Both Issues remained open under the configured
+  recovery-comment behavior; automatic closing is not enabled for this deployment.
+- The operator's lint notification contains the matching AI summary and next checks.
+  Their success notification links both Issues and contains no AI explanation.
+  The implementation skips model calls for successful runs; the VM's call accounting
+  was not independently inspected for this run.
+
+Together with the dependency example, this verifies live AI-enriched reports for
+two failure categories and recovery publication to both incidents. It remains a
+controlled portfolio demonstration rather than a broad quality or reliability study.
