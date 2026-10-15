@@ -85,3 +85,59 @@ def test_probe_does_not_call_paid_aliases(probe, env, monkeypatch):
     monkeypatch.setattr(probe.urllib.request, "build_opener", lambda _: pytest.fail("Paid request"))
     with pytest.raises(probe.SetupError, match="free/"):
         probe.probe(env)
+
+
+@pytest.mark.parametrize("free", [True, False])
+def test_amd_probe_verifies_free_catalog_before_any_completion(probe, env, monkeypatch, free):
+    env.update(LLM_BASE_URL="https://developer.amd.com.cn/radeon/api/v1", LLM_MODEL="MiniCPM5-2B")
+    calls = []
+
+    class Response(io.BytesIO):
+        status = 200
+
+    class Opener:
+        def open(self, request, timeout):
+            calls.append(request)
+            if request.full_url.endswith("/models"):
+                return Response(
+                    json.dumps(
+                        {"data": [{"id": "MiniCPM5-2B", "free": free, "json_output": True}]}
+                    ).encode()
+                )
+            assert free is True and len(calls) == 2
+            assert timeout == 30
+            return Response(b'{"choices":[{"message":{"content":"OK"}}]}')
+
+    monkeypatch.setattr(probe.urllib.request, "build_opener", lambda _: Opener())
+    if free:
+        assert probe.probe(env)["status"] == "accepted"
+        assert len(calls) == 2
+    else:
+        with pytest.raises(probe.SetupError, match="free=true"):
+            probe.probe(env)
+        assert len(calls) == 1
+
+
+def test_nested_amd_rate_limit_error_is_reported_without_raw_details(probe, env, monkeypatch):
+    class Opener:
+        def open(self, request, timeout):
+            error = {
+                "detail": {
+                    "error": {
+                        "code": "token_concurrency_rate_limit_exceeded",
+                        "message": env["LLM_API_KEY"],
+                    }
+                }
+            }
+            raise urllib.error.HTTPError(
+                request.full_url,
+                429,
+                "Too many requests",
+                {},
+                io.BytesIO(json.dumps(error).encode()),
+            )
+
+    monkeypatch.setattr(probe.urllib.request, "build_opener", lambda _: Opener())
+    result = probe.probe(env)
+    assert result["provider_code"] == "token_concurrency_rate_limit_exceeded"
+    assert env["LLM_API_KEY"] not in json.dumps(result)

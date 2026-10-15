@@ -6,7 +6,7 @@ import urllib.error
 import urllib.request
 
 from common import local_env
-from configure_llm import NoRedirect, SetupError, validate_options
+from configure_llm import NoRedirect, SetupError, is_amd_shared, validate_options, verify_catalog
 
 MAX_RESPONSE_BYTES = 16_384
 ERROR_CODES = {
@@ -20,6 +20,14 @@ ERROR_CODES = {
     "permission_denied",
     "rate_limit_error",
     "invalid_request_error",
+    "account_not_verified",
+    "token_rate_limit_exceeded",
+    "ip_rate_limit_exceeded",
+    "token_concurrency_rate_limit_exceeded",
+    "model_concurrency_rate_limit_exceeded",
+    "process_concurrency_rate_limit_exceeded",
+    "global_concurrency_rate_limit_exceeded",
+    "rate_limit_exceeded",
 }
 
 
@@ -37,6 +45,9 @@ def probe(env):
     token = env.get("LLM_API_KEY", "")
     if not token:
         raise SetupError("Configure LLM_API_KEY before running this check.")
+    if is_amd_shared(base_url):
+        # A plain AMD model name says nothing about cost; check the live catalog first.
+        verify_catalog(base_url, model, token)
     request = urllib.request.Request(
         base_url.rstrip("/") + "/chat/completions",
         data=json.dumps(
@@ -56,7 +67,9 @@ def probe(env):
     )
     result = {"model": model, "requested_output_tokens": 32}
     try:
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+        with urllib.request.build_opener(NoRedirect()).open(
+            request, timeout=30 if is_amd_shared(base_url) else 20
+        ) as response:
             payload = read_payload(response)
             message = payload["choices"][0]["message"]
             if not isinstance(message, dict):
@@ -74,6 +87,8 @@ def probe(env):
             )
         try:
             payload = read_payload(exc)
+            if isinstance(payload, dict) and isinstance(payload.get("detail"), dict):
+                payload = payload["detail"]
             error = payload.get("error", {}) if isinstance(payload, dict) else {}
             if isinstance(error, dict):
                 # Only fixed, known codes can be displayed. Never echo provider messages.

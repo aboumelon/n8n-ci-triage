@@ -144,6 +144,9 @@ reverse proxy or purchased domain is required for this layout.
 ## Optional AI-assisted investigation
 
 See [docs/llm.md](docs/llm.md) for setup, upgrade commands, and data boundaries.
+An AMD TokenFactory profile is available with
+`python3 scripts/configure_llm.py --provider amd`; it verifies a free, JSON-capable
+model from the provider's live catalog before saving its key.
 The `Explain findings (LLM)` node asks Python to call one OpenAI-compatible model
 with at most three bounded, redacted findings. A validated explanation adds possible
 causes and next checks to GitHub reports, plus a short Telegram summary. An API

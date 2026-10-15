@@ -69,3 +69,10 @@ def test_redaction_before_evidence_is_returned():
     assert "[REDACTED]" in result.evidence
     assert "\x1b" not in result.evidence
     assert "password=[REDACTED]" in redact("password=secret")
+
+
+def test_radeon_api_keys_are_redacted_without_needing_a_configured_match():
+    key = "rc-" + "a1" * 24
+    finding = analyze("AssertionError: unexpected credential " + key)
+    assert key not in finding.evidence
+    assert "[REDACTED]" in finding.evidence

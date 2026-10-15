@@ -117,3 +117,84 @@ def test_forbidden_diagnostics_distinguish_web_denial_from_api_errors(
     with pytest.raises(setup.SetupError, match=expected) as error:
         setup.verify_catalog(setup.DEFAULT_BASE_URL, setup.DEFAULT_MODEL, "private-token")
     assert "private-token" not in str(error.value)
+
+
+def test_amd_setup_uses_provider_profile_and_preserves_other_credentials(
+    setup, monkeypatch, tmp_path, capsys
+):
+    path = tmp_path / ".env"
+    path.write_text("GITHUB_TOKEN=keep-github\nTELEGRAM_BOT_TOKEN=keep-telegram\n")
+    key = "rc-" + "a" * 48
+    checked = []
+    monkeypatch.setattr(setup, "ROOT", tmp_path)
+    monkeypatch.setattr(setup.getpass, "getpass", lambda _: key)
+    monkeypatch.setattr(setup, "verify_catalog", lambda *args: checked.append(args))
+    setup.main(["--provider", "amd"])
+    assert checked == [(setup.AMD_BASE_URL, "MiniCPM5-2B", key)]
+    text = path.read_text()
+    assert "LLM_BASE_URL=https://developer.amd.com.cn/radeon/api/v1" in text
+    assert "LLM_MODEL=MiniCPM5-2B" in text and "LLM_TIMEOUT_SECONDS=30" in text
+    assert "GITHUB_TOKEN=keep-github" in text and "TELEGRAM_BOT_TOKEN=keep-telegram" in text
+    assert key not in capsys.readouterr().out
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize(
+    ("base_url", "model"),
+    [
+        ("https://developer.amd.com.cn.evil.test/radeon/api/v1", "MiniCPM5-2B"),
+        ("https://developer.amd.com.cn/radeon/api/v1/extra", "MiniCPM5-2B"),
+        ("https://developer.amd.com.cn/radeon/api/v1", "MiniCPM5-2B\nINJECT=true"),
+    ],
+)
+def test_plain_amd_model_ids_are_only_allowed_on_exact_shared_endpoint(setup, base_url, model):
+    with pytest.raises(setup.SetupError):
+        setup.validate_options(base_url, model)
+
+
+@pytest.mark.parametrize(
+    ("free", "json_output", "accepted"),
+    [
+        (True, True, True),
+        (False, True, False),
+        (True, False, False),
+        (None, True, False),
+        (1, True, False),
+        (True, "true", False),
+    ],
+)
+def test_amd_catalog_requires_explicit_free_and_json_flags(
+    setup, monkeypatch, free, json_output, accepted
+):
+    class Opener:
+        def open(self, request, timeout):
+            return io.BytesIO(
+                json.dumps(
+                    {"data": [{"id": "MiniCPM5-2B", "free": free, "json_output": json_output}]}
+                ).encode()
+            )
+
+    monkeypatch.setattr(setup.urllib.request, "build_opener", lambda _: Opener())
+    setup.validate_options(setup.AMD_BASE_URL, "MiniCPM5-2B")
+    if accepted:
+        setup.verify_catalog(setup.AMD_BASE_URL, "MiniCPM5-2B", "private-key")
+    else:
+        with pytest.raises(setup.SetupError, match="free=true and json_output=true"):
+            setup.verify_catalog(setup.AMD_BASE_URL, "MiniCPM5-2B", "private-key")
+
+
+def test_missing_amd_model_lists_only_free_json_capable_alternatives(setup, monkeypatch):
+    class Opener:
+        def open(self, request, timeout):
+            models = [
+                {"id": "DeepSeek-V4-Flash", "free": True, "json_output": True},
+                {"id": "Paid-Model", "free": False, "json_output": True},
+                {"id": "No-JSON", "free": True, "json_output": False},
+            ]
+            return io.BytesIO(json.dumps({"data": models}).encode())
+
+    monkeypatch.setattr(setup.urllib.request, "build_opener", lambda _: Opener())
+    with pytest.raises(setup.SetupError) as error:
+        setup.verify_catalog(setup.AMD_BASE_URL, "MiniCPM5-2B", "private-key")
+    assert "DeepSeek-V4-Flash" in str(error.value)
+    assert "Paid-Model" not in str(error.value) and "No-JSON" not in str(error.value)

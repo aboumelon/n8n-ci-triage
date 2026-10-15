@@ -7,7 +7,7 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - `uv sync --locked`: dependency installation succeeded.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest`: 103 passed; 2 PostgreSQL integration tests skipped locally.
+- `uv run pytest`: 119 passed; 2 PostgreSQL integration tests skipped locally.
 - `uv build`: source distribution and wheel built successfully.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
@@ -180,3 +180,20 @@ supplied the ordinary Telegram failure notification, and the matching
 [Issue occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6196922539)
 was read back from GitHub. This verifies that a live model-provider refusal did not
 block the report; it does not establish successful model generation.
+
+## AMD TokenFactory compatibility checks
+
+On 2026-10-15, the documented AMD shared API endpoint was checked without a key
+and returned HTTP 401 with a JSON response. This establishes endpoint reachability
+from the development environment, not authenticated inference or VM connectivity.
+
+Local checks cover the AMD setup profile, exact shared endpoint matching, rejection
+of missing/false/non-boolean free or JSON capability flags, filtered alternative
+models, preservation of existing service settings, private file permissions, and
+secret-safe output. The tiny probe checks the catalog before any AMD completion
+and does not call a model that is not explicitly marked free. Nested AMD rate-limit
+errors are reduced to known codes. Runtime tests exercise AMD's configured base URL,
+model ID, system/user message shape, and JSON response validation with a simulated
+provider. Radeon key-format redaction and omission of AMD-style reasoning fields
+are also covered. Live AMD credentials, explanation quality, and delivery of an
+AMD-generated report remain operator acceptance checks.

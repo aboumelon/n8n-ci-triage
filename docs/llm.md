@@ -9,6 +9,65 @@ installed on the VM, and no additional Python dependencies are needed.
 The default configuration is disabled. Existing workflows without this node can
 continue processing during an upgrade. New executions use the imported workflow.
 
+## Configure AMD TokenFactory
+
+The AMD Radeon Cloud Public Free Model APIs provide shared OpenAI-compatible
+endpoints for evaluation, development, and demos. This fits this portfolio project.
+The service has quotas and is not offered for production workloads; see its
+[API terms](https://amd-aim.github.io/radeon-cloud-docs/api/terms/).
+
+1. Sign in at [TokenFactory](https://developer.amd.com.cn/radeon/tokenfactory).
+2. Under **Public Free Model APIs**, open a model detail dialog and copy your API
+   key. Radeon keys start with `rc-`; the same key works across shared models.
+   Accounts pending verification may not have a key yet.
+3. In the VM repository directory, configure the AMD profile:
+
+```bash
+git pull --ff-only
+python3 scripts/configure_llm.py --provider amd
+python3 scripts/check_llm.py
+```
+
+Enter the Radeon key at the hidden prompt. The AMD profile selects
+`https://developer.amd.com.cn/radeon/api/v1` and `MiniCPM5-2B`, a small text model
+documented to support JSON output and answer without separated thinking. Its
+provider stability label is experimental; explanation quality still needs the
+operator's acceptance test. The helper verifies the exact live catalog entry and
+requires both `free=true` and `json_output=true` before saving anything. If the
+model is unavailable, it lists only free, JSON-capable alternatives. Choose one
+explicitly, for example:
+
+```bash
+python3 scripts/configure_llm.py --provider amd --model DeepSeek-V4-Flash
+```
+
+The helper preserves GitHub/Telegram settings, sets the HTTP timeout to 30 seconds,
+and never launches a GPU instance or chooses a dedicated endpoint. The existing
+Python client already speaks the required chat/JSON format. No new n8n credential,
+node, or workflow import is needed when the explanation stage is already published.
+
+After the tiny probe is accepted, rebuild/recreate the Python service:
+
+```bash
+sudo docker compose up -d --build --wait triage
+```
+
+Run a new controlled failure and inspect `llm.status`, the Issue comment, and the
+Telegram summary. An accepted tiny probe does not establish a valid full explanation.
+The model runs remotely at AMD; the Freestyle VM only calls its API. No model weights
+or GPU runtime are installed on the VM.
+
+The AMD probe checks the live free/JSON catalog before sending its single tiny
+completion. Nested rate-limit errors are reduced to recognized codes without raw
+messages. Shared capacity and per-account quotas can vary. The normal fallback
+still applies to timeouts, 429, provider failures, or invalid model output.
+
+References: [Model APIs](https://amd-aim.github.io/radeon-cloud-docs/guides/model-apis/),
+[catalog](https://amd-aim.github.io/radeon-cloud-docs/api/models/),
+[authentication](https://amd-aim.github.io/radeon-cloud-docs/api/authentication/), and
+[MiniCPM5-2B](https://amd-aim.github.io/radeon-cloud-docs/models/minicpm5-2b/), reviewed
+on 2026-10-15. Authenticated AMD inference has not yet been verified for this project.
+
 ## Configure Apinex
 
 Create an account and API key yourself at [Apinex](https://apinex.bond/keys).
@@ -67,7 +126,7 @@ python3 scripts/check_llm.py
 ```
 
 This sends only `Reply only OK.` with a 32-token output limit to the configured
-`free/` alias. It sends no CI data, performs no retries or model switches, changes
+free model. It sends no CI data, performs no retries or model switches, changes
 no settings, and prints only status and recognized error codes. The request may use
 a small amount of the provider's free allowance. It never prints the API key, raw
 error messages, reasoning, or model-generated text.
@@ -80,8 +139,9 @@ reducing `LLM_MAX_OUTPUT_TOKENS` may help but can also truncate the required JSO
 An accepted probe is not proof that a complete triage explanation will validate.
 After resolving access, run a new CI scenario because published reports are cached.
 
-The helper only accepts `free/` aliases. Direct configuration supports other
-OpenAI-compatible providers with these settings:
+For Apinex and custom endpoints, the helper only accepts `free/` aliases. On AMD's
+exact shared endpoint it accepts plain model IDs after live catalog verification.
+Direct configuration supports other OpenAI-compatible providers with these settings:
 
 ```dotenv
 LLM_ENABLED=false

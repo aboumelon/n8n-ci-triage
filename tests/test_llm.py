@@ -183,9 +183,26 @@ def test_response_size_limit_and_no_reasoning_persistence(enabled, report):
     assert result["status"] == "fallback" and result["reason"] == "response_too_large"
     data = envelope()
     data["choices"][0]["message"]["reasoning_content"] = "Private reasoning: " + KEY
+    data["choices"][0]["message"]["reasoning"] = "AMD-style private reasoning: " + KEY
     result = explainer_with(enabled, lambda _: httpx.Response(200, json=data)).explain(report)
     assert result["status"] == "completed" and "reasoning_content" not in json.dumps(result)
     assert KEY not in json.dumps(result)
+
+
+def test_amd_runtime_uses_configured_endpoint_and_existing_json_validation(enabled, report):
+    enabled.llm_base_url = "https://developer.amd.com.cn/radeon/api/v1"
+    enabled.llm_model = "MiniCPM5-2B"
+
+    def handler(request):
+        assert str(request.url) == "https://developer.amd.com.cn/radeon/api/v1/chat/completions"
+        body = json.loads(request.content)
+        assert body["model"] == "MiniCPM5-2B"
+        assert body["response_format"] == {"type": "json_object"}
+        assert body["messages"][0]["role"] == "system"
+        return httpx.Response(200, json=envelope())
+
+    result = explainer_with(enabled, handler).explain(report)
+    assert result["status"] == "completed" and result["model"] == "MiniCPM5-2B"
 
 
 def test_output_is_redacted_and_cannot_inject_issue_markers_or_mentions(enabled, report):

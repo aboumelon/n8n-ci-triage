@@ -17,6 +17,12 @@ from common import ROOT
 
 DEFAULT_BASE_URL = "https://api.apinex.bond/v1"
 DEFAULT_MODEL = "free/deepseek-v4.1-flash"
+AMD_BASE_URL = "https://developer.amd.com.cn/radeon/api/v1"
+AMD_MODEL = "MiniCPM5-2B"
+
+
+def is_amd_shared(base_url: str) -> bool:
+    return base_url.rstrip("/") == AMD_BASE_URL
 
 
 class SetupError(Exception):
@@ -40,8 +46,11 @@ def validate_options(base_url: str, model: str):
         or not re.fullmatch(r"https://[A-Za-z0-9.:/-]+", base_url)
     ):
         raise SetupError("Use an HTTPS API URL without credentials, a query, or env syntax.")
-    # This helper deliberately opts into only provider-labeled free aliases.
-    if not re.fullmatch(r"free/[A-Za-z0-9._-]{1,100}", model):
+    # AMD publishes plain model IDs and an explicit free flag in its catalog.
+    if is_amd_shared(base_url):
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,100}", model):
+            raise SetupError("Use an exact model ID from AMD's Public Free Model APIs catalog.")
+    elif not re.fullmatch(r"free/[A-Za-z0-9._-]{1,100}", model):
         raise SetupError("Choose a model ID beginning with free/ from the provider's catalog.")
 
 
@@ -90,18 +99,36 @@ def verify_catalog(base_url: str, model: str, token: str):
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
         raise SetupError("Invalid model catalog; settings were not changed.")
     available = {
-        item.get("id")
+        item["id"]: item
         for item in payload["data"]
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     }
     if model not in available:
+        pattern = (
+            r"[A-Za-z0-9][A-Za-z0-9._-]{0,100}"
+            if is_amd_shared(base_url)
+            else r"free/[A-Za-z0-9._-]{1,100}"
+        )
         choices = sorted(
-            item for item in available if re.fullmatch(r"free/[A-Za-z0-9._-]{1,100}", item)
+            name
+            for name, item in available.items()
+            if re.fullmatch(pattern, name)
+            and (
+                not is_amd_shared(base_url)
+                or (item.get("free") is True and item.get("json_output") is True)
+            )
         )[:20]
         message = "Selected model is not in your authenticated catalog; settings were not changed."
         if choices:
             message += "\nAvailable free aliases: " + ", ".join(choices)
         raise SetupError(message)
+    if is_amd_shared(base_url) and (
+        available[model].get("free") is not True or available[model].get("json_output") is not True
+    ):
+        raise SetupError(
+            "AMD's catalog must mark the selected model free=true and json_output=true; "
+            "settings were not changed."
+        )
 
 
 def save_settings(path: Path, base_url: str, model: str, token: str):
@@ -110,7 +137,7 @@ def save_settings(path: Path, base_url: str, model: str, token: str):
         "LLM_API_KEY": token,
         "LLM_BASE_URL": base_url.rstrip("/"),
         "LLM_MODEL": model,
-        "LLM_TIMEOUT_SECONDS": "15",
+        "LLM_TIMEOUT_SECONDS": "30" if is_amd_shared(base_url) else "15",
         "LLM_MAX_OUTPUT_TOKENS": "1200",
     }
     lines = path.read_text().splitlines()
@@ -132,9 +159,12 @@ def save_settings(path: Path, base_url: str, model: str, token: str):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--provider", choices=("apinex", "amd"), default="apinex")
+    parser.add_argument("--base-url")
+    parser.add_argument("--model")
     args = parser.parse_args(argv)
+    args.base_url = args.base_url or (AMD_BASE_URL if args.provider == "amd" else DEFAULT_BASE_URL)
+    args.model = args.model or (AMD_MODEL if args.provider == "amd" else DEFAULT_MODEL)
     validate_options(args.base_url, args.model)
     path = ROOT / ".env"
     if not path.is_file():
@@ -150,8 +180,8 @@ def main(argv=None):
     verify_catalog(args.base_url, args.model, token)
     save_settings(path, args.base_url, args.model, token)
     print(f"Saved LLM settings for {args.model}. The key was not displayed.")
-    print("Catalog access is verified; inference and free quota still need a new CI run.")
-    print("Rebuild triage and import/publish the updated n8n workflow; see docs/llm.md.")
+    print("Catalog access is verified. Next: python3 scripts/check_llm.py, then recreate triage.")
+    print("For first-time LLM setup, also import/publish the n8n workflow; see docs/llm.md.")
 
 
 if __name__ == "__main__":

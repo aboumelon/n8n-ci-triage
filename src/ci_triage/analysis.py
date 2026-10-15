@@ -43,6 +43,7 @@ def redact(value: str, secrets: list[str] | None = None) -> str:
         r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})", "[REDACTED]", value
     )
     value = re.sub(r"\b\d{6,15}:[A-Za-z0-9_-]{30,}\b", "[REDACTED]", value)
+    value = re.sub(r"\brc-[a-fA-F0-9]{48}\b", "[REDACTED]", value)
     value = re.sub(
         r"(?i)\b(authorization|password|passwd|secret|api[_-]?key|access[_-]?token)"
         r"\s*[:=]\s*(?:bearer\s+)?[^\s,;]+",
