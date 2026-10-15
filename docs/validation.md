@@ -169,9 +169,9 @@ exact model selection, and redirect refusal. An additional PostgreSQL test exerc
 concurrent enrichment; it runs in GitHub CI when `TEST_DATABASE_URL` is provided.
 
 These are implementation and orchestration checks with a simulated provider.
-Successful Apinex inference, response quality, and live AI-enriched Issue/Telegram
-delivery have not been verified. They require a new controlled failure after
-resolving provider access using [the LLM setup guide](llm.md).
+They do not establish provider inference quality or live delivery by themselves.
+Successful Apinex inference remains unverified. A subsequent live AI-enriched
+GitHub/Telegram report after AMD profile setup is recorded below.
 
 For live run `38768577720`, the operator supplied a saved report showing
 `status=done`, model `free/deepseek-v4.1-flash`, and `llm.status=fallback` with
@@ -195,8 +195,8 @@ completion. Nested AMD rate-limit errors are reduced to known codes.
 Runtime tests exercise AMD's configured base URL,
 model ID, system/user message shape, and JSON response validation with a simulated
 provider. Radeon key-format redaction and omission of AMD-style reasoning fields
-are also covered. Live AMD credentials, explanation quality, and delivery of an
-AMD-generated report remain operator acceptance checks.
+are also covered. These simulated checks do not establish live provider availability
+or explanation quality.
 
 Operator screenshots subsequently showed no catalog entries matching both boolean
 free/JSON flags, but the current AMD dashboard labelled `MiniCPM5-2B` **FREE**.
@@ -210,5 +210,30 @@ Simulated checks cover a successful JSON probe after metadata disagreement, quot
 and unsupported-format errors, timeouts, non-JSON output, missing catalog membership,
 truncated completions, tool calls, and strict validation of the tiny answer.
 Failed probes preserve the previous file without printing credentials or provider
-content. These are simulated provider checks; a successful authenticated AMD probe
-and a full AI-enriched report remain unverified at this point.
+content. These are simulated provider checks, distinct from the live evidence below.
+
+## Live AI-assisted report
+
+On 2026-10-15, after following the AMD MiniCPM5-2B profile setup and recreating the
+existing service image without a rebuild, the operator supplied an AI-enriched
+Telegram failure notification for [run 38783771381](https://github.com/aboumelon/n8n-ci-triage/actions/runs/38783771381/attempts/1).
+The run and its matching [Issue occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6199056681)
+were independently read back through GitHub's API.
+
+| Check | Evidence |
+|---|---|
+| Real controlled failure | `Triage demo`, branch `main`, attempt 1, source commit `432d1120b8ec8fd9acdff06a8c0306c282619ee0`; the intentionally missing module failed the job as designed |
+| Deterministic result retained | Category `dependency`, the original missing-module evidence, and fingerprint `50f5e2a25eab8de88915e653dfeabe23` |
+| Validated AI explanation published | The occurrence comment contains `AI-assisted investigation`, a missing-module explanation, three possible causes, and three next checks |
+| Existing incident reused | The report was appended to Issue 3 rather than creating another issue for the same fingerprint |
+| Telegram delivery | The operator supplied the matching run and Issue URLs, an AI summary, and two investigation checks |
+
+The application publishes these AI sections only after the explanation passes its
+local schema and finding-index validation with `llm.status=completed`. Seeing both
+sections confirms a successful enrichment path rather than the ordinary fallback.
+Telegram receipt remains operator-reported; the GitHub comment was read directly.
+The saved provider/model metadata, token usage, and latency were not independently
+read from the VM, so the configured AMD model identity is based on the setup flow.
+This one missing-dependency example is not an explanation-quality benchmark or an
+availability guarantee. The advice is generic and does not establish that the
+dependency should actually be added; this demo intentionally imports a missing module.

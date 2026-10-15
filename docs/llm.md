@@ -72,11 +72,17 @@ and never launches a GPU instance or chooses a dedicated endpoint. The existing
 Python client already speaks the required chat/JSON format. No new n8n credential,
 node, or workflow import is needed when the explanation stage is already published.
 
-After the tiny probe is accepted, rebuild/recreate the Python service:
+After the tiny probe is accepted, recreate the Python service to load `.env`.
+If the running image already includes the LLM stage, a provider change does not
+require an image build or a registry connection:
 
 ```bash
-sudo docker compose up -d --build --wait triage
+sudo docker compose up -d --no-build --pull never --force-recreate --wait triage
 ```
+
+For a first installation or changes to Python runtime code, build the updated
+image using the upgrade commands below instead. Reusing an existing image does
+not install newer source code from the checkout.
 
 Run a new controlled failure and inspect `llm.status`, the Issue comment, and the
 Telegram summary. An accepted tiny probe does not establish a valid full explanation.
@@ -93,7 +99,9 @@ References: [Model APIs](https://amd-aim.github.io/radeon-cloud-docs/guides/mode
 [catalog](https://amd-aim.github.io/radeon-cloud-docs/api/models/),
 [authentication](https://amd-aim.github.io/radeon-cloud-docs/api/authentication/), and
 [MiniCPM5-2B](https://amd-aim.github.io/radeon-cloud-docs/models/minicpm5-2b/), reviewed
-on 2026-10-15. Authenticated AMD inference has not yet been verified for this project.
+on 2026-10-15. After the operator configured this profile, a live controlled failure
+produced AI-enriched GitHub and Telegram reports; see [validation.md](validation.md)
+for the exact evidence and verification limits.
 
 ## Configure Apinex
 
