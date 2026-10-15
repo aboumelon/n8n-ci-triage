@@ -104,6 +104,8 @@ read back through the GitHub API:
 | Repeated failure | [Occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6193523803) for run `38744994244` on the same Issue |
 | Successful recovery | [Recovery comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6193552628) for successful run `38745185682` |
 | Failure after Telegram setup | [Occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6194195838) for run `38749572663` |
+| Recovery after Telegram setup | [Recovery comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6194441470) for run `38751301505`; the operator supplied the matching Telegram success message |
+| Scenario after manually pausing the VM | [Occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6194777670) for run `38753633193`; the operator reported automatic return to `running` and successful processing |
 
 After running the private-chat pairing helper and recreating `triage`, the operator
 reported receiving the real CI notification in Telegram. The supplied message names
@@ -111,16 +113,27 @@ reported receiving the real CI notification in Telegram. The supplied message na
 category `dependency`, and the intentionally missing dependency. It links run
 `38749572663`, attempt 1, and Issue 3, matching the GitHub evidence above.
 
+The operator subsequently supplied a `CI success` Telegram notification for the
+same workflow and branch, linking run `38751301505`, attempt 1, and Issue 3. Its
+matching GitHub recovery comment was independently read back through the API.
+
+The operator then manually paused the Freestyle VM and launched another controlled
+failure, run `38753633193`. They reported that the VM returned to `running` after
+the scenario and that processing worked correctly. The matching failure comment
+was independently read back from Issue 3. This is operator-observed wake-up from
+a manually paused VM; it does not measure automatic idle pausing or wake-up latency.
+
 This establishes live Issue publication, repeat-failure updates, workflow recovery
-comments, and operator-reported Telegram failure delivery. Telegram receipt was
-confirmed by the operator's supplied message, rather than direct access to their chat.
+comments, and operator-reported Telegram failure and success delivery. Telegram
+receipt and VM state were confirmed by the operator, rather than direct access
+to their chat or VM control plane.
 The intentionally failing demo is an acceptance test and does not indicate failure
 of the project's normal CI.
 
 ## Remaining checks
 
 - Verify persistence across a complete stack restart and a backup/restore exercise.
-- Verify effective VM retention, automatic wake-up, and pause/resume with the editor
-  closed. The demo smoke test does not measure GitHub delivery deadlines or quotas.
-- Verify that a subsequent live successful run also delivers a recovery notification
-  to Telegram. GitHub recovery comments are already verified above.
+- Confirm the effective idle-timeout and retention settings and observe automatic
+  idle pausing. Wake-up from a manual pause is already recorded above.
+- The acceptance tests do not establish GitHub delivery deadlines, provider quota
+  behavior, or sustained production availability.
