@@ -12,6 +12,17 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
 
+## GitHub Actions verification
+
+The first published source commit `cc0cf07381a5a31e12ba27eaf91fc79afb60945a`
+passed [GitHub Actions CI](https://github.com/aboumelon/n8n-ci-triage/actions/runs/38715278277) on
+2026-10-15. The run completed successfully with:
+
+- **37 tests passed**, including the PostgreSQL concurrent ingestion and claim test.
+- Ruff lint and formatting checks passed.
+- `docker compose config --quiet` passed.
+- `docker compose build triage` built the deployment image successfully.
+
 ## Real n8n integration check
 
 A temporary n8n instance was initialized, an owner account was created, the header
@@ -37,15 +48,10 @@ accepts an Issue creation and then raises a simulated connection failure.
 
 ## Checks that still require deployment access
 
-- Docker Engine is unavailable in the authoring environment, so the complete Compose
-  stack and container build were not run locally. The GitHub CI configuration includes
-  Compose validation and the image build.
-- Native PostgreSQL could not start in the authoring environment because it provides
-  only UID 0, while PostgreSQL requires a non-root runtime user. The CI configuration
-  supplies PostgreSQL and runs the concurrent ingestion/claim integration test.
+- The complete Compose deployment, including n8n owner setup and persistence across
+  container restarts, still needs a smoke test on the target VM. Image building and
+  the PostgreSQL queue integration test have already passed in GitHub CI.
 - A Freestyle VM was not provisioned; no Freestyle account credential was available.
   Verify effective retention, HTTPS routing, pause/resume, and restart persistence there.
 - No live GitHub Issue or Telegram message was sent. Those require the operator's
   account credentials and a reachable deployed gateway.
-- No remote GitHub CI result exists until the repository is created and the source
-  is pushed. Local test success must not be presented as a green GitHub Actions run.
