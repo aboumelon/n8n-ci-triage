@@ -25,17 +25,30 @@ The service has quotas and is not offered for production workloads; see its
 ```bash
 git pull --ff-only
 python3 scripts/configure_llm.py --provider amd
-python3 scripts/check_llm.py
 ```
 
 Enter the Radeon key at the hidden prompt. The AMD profile selects
 `https://developer.amd.com.cn/radeon/api/v1` and `MiniCPM5-2B`, a small text model
 documented to support JSON output and answer without separated thinking. Its
 provider stability label is experimental; explanation quality still needs the
-operator's acceptance test. The helper verifies the exact live catalog entry and
-requires both `free=true` and `json_output=true` before saving anything. If the
-model is unavailable, it lists only free, JSON-capable alternatives. Choose one
-explicitly, for example:
+operator's acceptance test. The helper requires the exact model in the authenticated
+live catalog, then sends one 32-token JSON capability probe before saving anything.
+It requests `response_format: {"type":"json_object"}` and validates the tiny answer,
+including a completed `stop` response without tool calls. No CI data is sent.
+An API error, timeout, empty response, or invalid JSON leaves `.env` unchanged.
+
+On 2026-10-15, the operator's live catalog did not expose any model with both
+`free=true` and `json_output=true`, while AMD's current dashboard labelled
+`MiniCPM5-2B` **FREE** and its documentation described shared endpoints as free
+and this model as JSON-capable. Only this exact model on the exact shared endpoint
+can use that documented profile when capability flags disagree. The helper reports
+the disagreement and requires the real JSON probe; it does not rewrite `false` to
+`true`, accept arbitrary unmarked models, or use dedicated GPU endpoints.
+Free access follows AMD's shared-service terms; a probe verifies response capability,
+not future pricing or explanation quality.
+
+Other AMD models still require explicit `free=true` and `json_output=true` metadata,
+followed by the same JSON probe. Select an alternative explicitly, for example:
 
 ```bash
 python3 scripts/configure_llm.py --provider amd --model DeepSeek-V4-Flash
@@ -70,10 +83,11 @@ Telegram summary. An accepted tiny probe does not establish a valid full explana
 The model runs remotely at AMD; the Freestyle VM only calls its API. No model weights
 or GPU runtime are installed on the VM.
 
-The AMD probe checks the live free/JSON catalog before sending its single tiny
-completion. Nested rate-limit errors are reduced to recognized codes without raw
-messages. Shared capacity and per-account quotas can vary. The normal fallback
-still applies to timeouts, 429, provider failures, or invalid model output.
+`python3 scripts/check_llm.py` can repeat the same small JSON check later using the
+saved key. It applies the same catalog/profile rules before its single completion.
+Nested rate-limit errors are reduced to recognized codes without raw messages.
+Shared capacity and per-account quotas can vary. The normal fallback still applies
+to timeouts, 429, provider failures, or invalid model output.
 
 References: [Model APIs](https://amd-aim.github.io/radeon-cloud-docs/guides/model-apis/),
 [catalog](https://amd-aim.github.io/radeon-cloud-docs/api/models/),
@@ -138,11 +152,13 @@ Run a single small diagnostic request, using the key already saved in `.env`:
 python3 scripts/check_llm.py
 ```
 
-This sends only `Reply only OK.` with a 32-token output limit to the configured
-free model. It sends no CI data, performs no retries or model switches, changes
+This requests only `{"ok":true}` in JSON mode with a 32-token output limit from the
+configured free model. It sends no CI data, performs no retries or model switches, changes
 no settings, and prints only status and recognized error codes. The request may use
 a small amount of the provider's free allowance. It never prints the API key, raw
-error messages, reasoning, or model-generated text.
+error messages, reasoning, or model-generated text. `status=accepted` requires a
+valid, complete JSON response; an HTTP 200 with an empty or malformed answer is
+`invalid_response`.
 
 If this small request also gets 402, review the account's remaining free allowance
 and this API key's spending limit, or ask provider support about free-model access.

@@ -129,6 +129,11 @@ def test_amd_setup_uses_provider_profile_and_preserves_other_credentials(
     monkeypatch.setattr(setup, "ROOT", tmp_path)
     monkeypatch.setattr(setup.getpass, "getpass", lambda _: key)
     monkeypatch.setattr(setup, "verify_catalog", lambda *args: checked.append(args))
+    monkeypatch.setattr(
+        setup,
+        "request_json_probe",
+        lambda *args, **kwargs: {"status": "accepted", "json_output_valid": True},
+    )
     setup.main(["--provider", "amd"])
     assert checked == [(setup.AMD_BASE_URL, "MiniCPM5-2B", key)]
     text = path.read_text()
@@ -163,24 +168,24 @@ def test_plain_amd_model_ids_are_only_allowed_on_exact_shared_endpoint(setup, ba
         (True, "true", False),
     ],
 )
-def test_amd_catalog_requires_explicit_free_and_json_flags(
+def test_other_amd_models_require_explicit_free_and_json_flags(
     setup, monkeypatch, free, json_output, accepted
 ):
     class Opener:
         def open(self, request, timeout):
             return io.BytesIO(
                 json.dumps(
-                    {"data": [{"id": "MiniCPM5-2B", "free": free, "json_output": json_output}]}
+                    {"data": [{"id": "Other-Model", "free": free, "json_output": json_output}]}
                 ).encode()
             )
 
     monkeypatch.setattr(setup.urllib.request, "build_opener", lambda _: Opener())
-    setup.validate_options(setup.AMD_BASE_URL, "MiniCPM5-2B")
+    setup.validate_options(setup.AMD_BASE_URL, "Other-Model")
     if accepted:
-        setup.verify_catalog(setup.AMD_BASE_URL, "MiniCPM5-2B", "private-key")
+        setup.verify_catalog(setup.AMD_BASE_URL, "Other-Model", "private-key")
     else:
         with pytest.raises(setup.SetupError, match="free=true and json_output=true"):
-            setup.verify_catalog(setup.AMD_BASE_URL, "MiniCPM5-2B", "private-key")
+            setup.verify_catalog(setup.AMD_BASE_URL, "Other-Model", "private-key")
 
 
 def test_missing_amd_model_lists_only_free_json_capable_alternatives(setup, monkeypatch):
@@ -232,3 +237,74 @@ def test_list_models_does_not_save_credentials_or_call_inference(
     output = capsys.readouterr().out
     assert json.loads(output)["models"][0]["json_output"] == "missing"
     assert key not in output and path.read_text() == original
+
+
+@pytest.mark.parametrize("outcome", ["valid", "not-json", "quota", "unsupported", "timeout"])
+def test_amd_metadata_disagreement_requires_valid_json_before_saving(
+    setup, monkeypatch, tmp_path, capsys, outcome
+):
+    path = tmp_path / ".env"
+    original = "GITHUB_TOKEN=keep-github\nLLM_BASE_URL=https://api.apinex.bond/v1\n"
+    path.write_text(original)
+    key = "rc-" + "a" * 48
+    calls = []
+    monkeypatch.setattr(setup, "ROOT", tmp_path)
+    monkeypatch.setattr(setup.getpass, "getpass", lambda _: key)
+
+    class Response(io.BytesIO):
+        status = 200
+
+    class Opener:
+        def open(self, request, timeout):
+            calls.append(request)
+            if request.full_url.endswith("/models"):
+                return Response(b'{"data":[{"id":"MiniCPM5-2B","free":false,"json_output":false}]}')
+            assert request.full_url == setup.AMD_BASE_URL + "/chat/completions"
+            data = json.loads(request.data)
+            assert data["model"] == "MiniCPM5-2B" and data["max_tokens"] == 32
+            assert data["response_format"] == {"type": "json_object"} and timeout == 30
+            if outcome in {"quota", "unsupported"}:
+                raise urllib.error.HTTPError(
+                    request.full_url,
+                    429 if outcome == "quota" else 400,
+                    key,
+                    {},
+                    io.BytesIO(json.dumps({"error": {"message": key}}).encode()),
+                )
+            if outcome == "timeout":
+                raise TimeoutError(key)
+            content = '{"ok":true}' if outcome == "valid" else key
+            return Response(
+                json.dumps(
+                    {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+                ).encode()
+            )
+
+    monkeypatch.setattr(setup.urllib.request, "build_opener", lambda _: Opener())
+    if outcome == "valid":
+        setup.main(["--provider", "amd"])
+        saved = path.read_text()
+        assert "LLM_MODEL=MiniCPM5-2B" in saved and "GITHUB_TOKEN=keep-github" in saved
+        assert "LLM_API_KEY=" + key in saved
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    else:
+        with pytest.raises(setup.SetupError, match="JSON probe failed") as error:
+            setup.main(["--provider", "amd"])
+        assert path.read_text() == original and key not in str(error.value)
+    output = capsys.readouterr().out
+    assert "Catalog flags differ" in output and key not in output
+    assert len(calls) == 2
+
+
+def test_documented_amd_profile_still_requires_live_catalog_membership(
+    setup, monkeypatch, tmp_path
+):
+    path = tmp_path / ".env"
+    path.write_text("LLM_ENABLED=false\n")
+    monkeypatch.setattr(setup, "ROOT", tmp_path)
+    monkeypatch.setattr(setup.getpass, "getpass", lambda _: "rc-" + "a" * 48)
+    monkeypatch.setattr(setup, "fetch_catalog", lambda *_: {})
+    monkeypatch.setattr(setup, "request_json_probe", lambda *a, **kw: pytest.fail("No model call"))
+    with pytest.raises(setup.SetupError, match="not in your authenticated catalog"):
+        setup.main(["--provider", "amd"])
+    assert path.read_text() == "LLM_ENABLED=false\n"

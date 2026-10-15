@@ -7,7 +7,7 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - `uv sync --locked`: dependency installation succeeded.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest`: 121 passed; 2 PostgreSQL integration tests skipped locally.
+- `uv run pytest`: 133 passed; 2 PostgreSQL integration tests skipped locally.
 - `uv build`: source distribution and wheel built successfully.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
@@ -188,19 +188,27 @@ and returned HTTP 401 with a JSON response. This establishes endpoint reachabili
 from the development environment, not authenticated inference or VM connectivity.
 
 Local checks cover the AMD setup profile, exact shared endpoint matching, rejection
-of missing/false/non-boolean free or JSON capability flags, filtered alternative
-models, preservation of existing service settings, private file permissions, and
-secret-safe output. The tiny probe checks the catalog before any AMD completion
-and does not call a model that is not explicitly marked free. Nested AMD rate-limit
-errors are reduced to known codes. Runtime tests exercise AMD's configured base URL,
+of missing/false/non-boolean free or JSON flags for unrecognised models, filtered
+alternatives, preservation of existing service settings, private file permissions,
+and secret-safe output. The tiny probe checks catalog membership before any AMD
+completion. Nested AMD rate-limit errors are reduced to known codes.
+Runtime tests exercise AMD's configured base URL,
 model ID, system/user message shape, and JSON response validation with a simulated
 provider. Radeon key-format redaction and omission of AMD-style reasoning fields
 are also covered. Live AMD credentials, explanation quality, and delivery of an
 AMD-generated report remain operator acceptance checks.
 
-An operator-supplied setup screenshot subsequently showed that `MiniCPM5-2B`
-was found but did not pass the expected top-level free/JSON flag checks. That
-message alone does not establish whether flags were absent, negative, or differently
-typed. The diagnostic catalog mode is tested to distinguish these cases while
-omitting secrets and leaving existing settings untouched. The guard remains in
-place until actual catalog metadata is inspected.
+Operator screenshots subsequently showed no catalog entries matching both boolean
+free/JSON flags, but the current AMD dashboard labelled `MiniCPM5-2B` **FREE**.
+The exact shared endpoint and JSON support were also checked against AMD's current
+[shared API guide](https://amd-aim.github.io/radeon-cloud-docs/guides/model-apis/)
+and [model reference](https://amd-aim.github.io/radeon-cloud-docs/models/minicpm5-2b/).
+The helper now permits that documented model profile despite conflicting metadata,
+requires its live catalog membership, and tests actual JSON output before saving
+any AMD settings. This exception does not apply to other models or endpoints.
+Simulated checks cover a successful JSON probe after metadata disagreement, quota
+and unsupported-format errors, timeouts, non-JSON output, missing catalog membership,
+truncated completions, tool calls, and strict validation of the tiny answer.
+Failed probes preserve the previous file without printing credentials or provider
+content. These are simulated provider checks; a successful authenticated AMD probe
+and a full AI-enriched report remain unverified at this point.

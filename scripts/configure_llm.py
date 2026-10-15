@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from common import ROOT
+from llm_probe import NoRedirect, request_json_probe
 
 DEFAULT_BASE_URL = "https://api.apinex.bond/v1"
 DEFAULT_MODEL = "free/deepseek-v4.1-flash"
@@ -29,11 +30,6 @@ class SetupError(Exception):
     """A setup failure whose text is safe to display."""
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def validate_options(base_url: str, model: str):
     url = urlsplit(base_url)
     if (
@@ -46,7 +42,7 @@ def validate_options(base_url: str, model: str):
         or not re.fullmatch(r"https://[A-Za-z0-9.:/-]+", base_url)
     ):
         raise SetupError("Use an HTTPS API URL without credentials, a query, or env syntax.")
-    # AMD publishes plain model IDs and an explicit free flag in its catalog.
+    # Plain model IDs are confined to AMD's exact documented shared endpoint.
     if is_amd_shared(base_url):
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,100}", model):
             raise SetupError("Use an exact model ID from AMD's Public Free Model APIs catalog.")
@@ -142,7 +138,16 @@ def catalog_summary(available: dict, token: str) -> list[dict]:
     return result
 
 
-def verify_catalog(base_url: str, model: str, token: str):
+def amd_model_supported(model: str, item: dict) -> bool:
+    # AMD documents this exact shared model as free and JSON-capable. Its dashboard
+    # still labels it FREE when /models capability flags disagree (2026-10-15).
+    # Keep this compatibility rule scoped to one model; require a real JSON probe
+    # before saving its settings. Never apply it to a dedicated or custom endpoint.
+    return model == AMD_MODEL or (item.get("free") is True and item.get("json_output") is True)
+
+
+def verify_catalog(base_url: str, model: str, token: str) -> bool:
+    """Verify membership; return whether the documented AMD profile was needed."""
     available = fetch_catalog(base_url, token)
     if model not in available:
         pattern = (
@@ -154,18 +159,13 @@ def verify_catalog(base_url: str, model: str, token: str):
             name
             for name, item in available.items()
             if re.fullmatch(pattern, name)
-            and (
-                not is_amd_shared(base_url)
-                or (item.get("free") is True and item.get("json_output") is True)
-            )
+            and (not is_amd_shared(base_url) or amd_model_supported(name, item))
         )[:20]
         message = "Selected model is not in your authenticated catalog; settings were not changed."
         if choices:
             message += "\nAvailable free aliases: " + ", ".join(choices)
         raise SetupError(message)
-    if is_amd_shared(base_url) and (
-        available[model].get("free") is not True or available[model].get("json_output") is not True
-    ):
+    if is_amd_shared(base_url) and not amd_model_supported(model, available[model]):
         raise SetupError(
             "AMD's catalog must mark the selected model free=true and json_output=true; "
             "settings were not changed.\n"
@@ -173,6 +173,9 @@ def verify_catalog(base_url: str, model: str, token: str):
             + "\nInspect all models: "
             "python3 scripts/configure_llm.py --provider amd --list-models"
         )
+    return is_amd_shared(base_url) and (
+        available[model].get("free") is not True or available[model].get("json_output") is not True
+    )
 
 
 def save_settings(path: Path, base_url: str, model: str, token: str):
@@ -233,10 +236,27 @@ def main(argv=None):
             )
         )
         return
-    verify_catalog(args.base_url, args.model, token)
+    documented_profile = verify_catalog(args.base_url, args.model, token)
+    if is_amd_shared(args.base_url):
+        if documented_profile:
+            print(
+                "Catalog flags differ from AMD's documented MiniCPM5-2B shared free profile. "
+                "Verifying JSON output with one 32-token probe."
+            )
+        result = request_json_probe(args.base_url, args.model, token, timeout=30)
+        if result["status"] != "accepted":
+            raise SetupError(
+                "AMD JSON probe failed; settings were not changed.\n" + json.dumps(result, indent=2)
+            )
+        print(json.dumps(result, indent=2))
     save_settings(path, args.base_url, args.model, token)
     print(f"Saved LLM settings for {args.model}. The key was not displayed.")
-    print("Catalog access is verified. Next: python3 scripts/check_llm.py, then recreate triage.")
+    if is_amd_shared(args.base_url):
+        print("JSON probe passed. Next: sudo docker compose up -d --build --wait triage")
+    else:
+        print(
+            "Catalog access is verified. Next: python3 scripts/check_llm.py, then recreate triage."
+        )
     print("For first-time LLM setup, also import/publish the n8n workflow; see docs/llm.md.")
 
 
