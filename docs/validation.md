@@ -7,7 +7,7 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - `uv sync --locked`: dependency installation succeeded.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest`: 39 passed; 1 PostgreSQL integration test skipped locally.
+- `uv run pytest`: 47 passed; 1 PostgreSQL integration test skipped locally.
 - `uv build`: source distribution and wheel built successfully.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
@@ -26,6 +26,14 @@ passed [GitHub Actions CI](https://github.com/aboumelon/n8n-ci-triage/actions/ru
 The deployment reset fix at `ad59a1ee4dd265330128aed3784737a1e4c925d1` also passed
 [GitHub Actions CI](https://github.com/aboumelon/n8n-ci-triage/actions/runs/38730491291),
 including the additional deployment-verifier regression tests.
+
+The Telegram pairing helper at `ff08bf8577bd43221cd9f96407d20712bb20b01b` passed
+[GitHub Actions CI](https://github.com/aboumelon/n8n-ci-triage/actions/runs/38748810230).
+Its regression checks cover selection of the verified private chat among unrelated
+chats, preservation of existing configuration after setup failures, private file
+permissions, and token-safe API error messages. A separate local PTY check exercised
+the real hidden token prompt and Enter prompt with simulated Telegram responses;
+that local check did not send a live message.
 
 ## Real n8n integration check
 
@@ -84,10 +92,35 @@ to a real GitHub repository or Telegram chat. The gateway is
 `https://aboumelon-ci-65a149-hooks.style.dev/webhooks/github`; the n8n editor is
 `https://aboumelon-ci-65a149-n8n.style.dev` and requires the operator's account.
 
+## Live GitHub and Telegram verification
+
+On 2026-10-15, the operator configured live GitHub access and enabled Issue
+publication on the target VM. The following repository evidence was subsequently
+read back through the GitHub API:
+
+| Check | Evidence |
+|---|---|
+| First Issue publication | [Issue 3](https://github.com/aboumelon/n8n-ci-triage/issues/3), category `dependency`, links run `38743199205` |
+| Repeated failure | [Occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6193523803) for run `38744994244` on the same Issue |
+| Successful recovery | [Recovery comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6193552628) for successful run `38745185682` |
+| Failure after Telegram setup | [Occurrence comment](https://github.com/aboumelon/n8n-ci-triage/issues/3#issuecomment-6194195838) for run `38749572663` |
+
+After running the private-chat pairing helper and recreating `triage`, the operator
+reported receiving the real CI notification in Telegram. The supplied message names
+`aboumelon/n8n-ci-triage`, workflow `Triage demo`, branch `main`, job `controlled-demo`,
+category `dependency`, and the intentionally missing dependency. It links run
+`38749572663`, attempt 1, and Issue 3, matching the GitHub evidence above.
+
+This establishes live Issue publication, repeat-failure updates, workflow recovery
+comments, and operator-reported Telegram failure delivery. Telegram receipt was
+confirmed by the operator's supplied message, rather than direct access to their chat.
+The intentionally failing demo is an acceptance test and does not indicate failure
+of the project's normal CI.
+
 ## Remaining checks
 
 - Verify persistence across a complete stack restart and a backup/restore exercise.
 - Verify effective VM retention, automatic wake-up, and pause/resume with the editor
   closed. The demo smoke test does not measure GitHub delivery deadlines or quotas.
-- No live GitHub Issue or Telegram message was sent. Those require the operator's
-  account credentials and a reachable deployed gateway.
+- Verify that a subsequent live successful run also delivers a recovery notification
+  to Telegram. GitHub recovery comments are already verified above.
