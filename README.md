@@ -4,9 +4,10 @@ An evidence-first assistant for GitHub Actions failures. n8n coordinates a durab
 Python pipeline that reads failed job logs, classifies a small set of known errors,
 groups repeat failures into GitHub Issues, and optionally sends Telegram notifications.
 
-**Status: initial implementation.** The default configuration is a local, account-free
-demo. GitHub writes and Telegram delivery require explicit configuration. No LLM or
-paid AI API is needed.
+**Status: working portfolio demo.** The core GitHub and Telegram flow has been exercised
+on Freestyle; see [validation evidence](docs/validation.md). The default configuration
+is a local, account-free demo. An optional LLM stage adds investigation advice and
+requires a separately configured API key.
 
 ## What it demonstrates
 
@@ -18,7 +19,8 @@ paid AI API is needed.
 - Incident grouping scoped to repository, workflow, branch, job, and normalized evidence.
 - Marker-based reconciliation of GitHub Issues and occurrence comments after retries.
 - Ordered recovery tracking; stale successes cannot resolve newer failures.
-- A nine-node n8n workflow with webhook, manual, and recovery triggers.
+- A ten-node n8n workflow with webhook, manual, and recovery triggers.
+- Optional structured LLM explanations, with bounded input/output and rule-based fallback.
 - Optional Telegram notifications and saved drafts when external delivery is disabled.
 
 ## Architecture
@@ -28,15 +30,18 @@ flowchart TD
   G["GitHub Actions"] -->|"Signed workflow_run"| A["Python gateway"]
   A -->|"Persist before acknowledgement"| D[("PostgreSQL inbox")]
   A -->|"Wake the workflow"| N["n8n"]
-  N -->|"Claim, analyze, publish, notify, acknowledge"| S["Python triage API"]
+  N -->|"Claim, analyze, explain, publish, notify, acknowledge"| S["Python triage API"]
   S --> D
   S -->|"Logs and Issues"| G
   S --> T["Telegram"]
+  S -.->|"Optional redacted evidence"| L["OpenAI-compatible LLM API"]
 ```
 
 n8n owns orchestration and retries between stages. Python owns signature verification,
 log parsing, incident identity, and persistence. Only Python receives the GitHub and
-Telegram tokens. The workflow contains a credential reference, never a secret value.
+Telegram and LLM tokens. The workflow contains a credential reference, never a secret value.
+The LLM runs at the remote provider, not on the VM. It cannot change classification,
+incident fingerprints, or recovery decisions.
 
 ## Run the Docker demo
 
@@ -69,7 +74,7 @@ drafts. Wait for the n8n execution to finish before inspecting the report.
 If CLI import is unavailable, import `workflows/ci-triage.json` in the editor. Create
 one **Header Auth** credential named **CI Triage Internal API**, with header
 `X-Triage-Key` and the `INTERNAL_API_KEY` value from your private `.env`. Assign it to
-the Webhook node and the five HTTP Request nodes, then Publish.
+the Webhook node and the six HTTP Request nodes, then Publish.
 
 Additional examples:
 
@@ -136,6 +141,15 @@ Follow [docs/freestyle.md](docs/freestyle.md). The same Compose stack runs insid
 Ubuntu VM. Route two HTTPS `style.dev` names to ports `8000` and `5678`; no additional
 reverse proxy or purchased domain is required for this layout.
 
+## Optional AI-assisted investigation
+
+See [docs/llm.md](docs/llm.md) for setup, upgrade commands, and data boundaries.
+The `Explain findings (LLM)` node asks Python to call one OpenAI-compatible model
+with at most three bounded, redacted findings. A validated explanation adds possible
+causes and next checks to GitHub reports, plus a short Telegram summary. An API
+failure, quota error, or invalid response preserves the original deterministic report.
+No automatic paid-model fallback is configured.
+
 ## Delivery guarantees and limits
 
 - A valid webhook is acknowledged after durable insertion. If the n8n wake-up fails,
@@ -175,4 +189,4 @@ reverse proxy or purchased domain is required for this layout.
 | `.github/workflows/` | Normal checks and opt-in failure scenarios |
 
 Roadmap: a GitHub App installation flow, versioned migrations, richer log parsers,
-metrics, and an optional evidence-constrained LLM explanation stage.
+metrics, and measured evaluation of LLM advice against labeled CI failures.

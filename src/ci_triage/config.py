@@ -1,6 +1,7 @@
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,12 @@ class Settings(BaseSettings):
     max_log_bytes: int = 1_048_576
     max_failed_jobs: int = 20
     request_timeout_seconds: float = 25
+    llm_enabled: bool = False
+    llm_api_key: SecretStr = SecretStr("")
+    llm_base_url: str = "https://api.apinex.bond/v1"
+    llm_model: str = "free/deepseek-v4.1-flash"
+    llm_timeout_seconds: float = Field(default=15, ge=1, le=30)
+    llm_max_output_tokens: int = Field(default=1_200, ge=200, le=2_000)
 
     @property
     def repository_allowlist(self) -> set[str]:
@@ -40,6 +47,7 @@ class Settings(BaseSettings):
                 self.internal_api_key,
                 self.github_token,
                 self.telegram_bot_token,
+                self.llm_api_key,
             )
             if value.get_secret_value()
         ]
@@ -63,4 +71,22 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Lease must be at least 60 seconds; processing attempts must be positive"
             )
+        url = urlsplit(self.llm_base_url)
+        if (
+            url.scheme != "https"
+            or not url.hostname
+            or url.username
+            or url.password
+            or url.query
+            or url.fragment
+        ):
+            raise ValueError("LLM_BASE_URL must be an HTTPS API URL without credentials or a query")
+        if (
+            not self.llm_model
+            or len(self.llm_model) > 120
+            or any(character.isspace() for character in self.llm_model)
+        ):
+            raise ValueError("LLM_MODEL must be a nonempty model ID of at most 120 characters")
+        if self.llm_enabled and not self.llm_api_key.get_secret_value():
+            raise ValueError("LLM_ENABLED requires LLM_API_KEY")
         return self

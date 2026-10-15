@@ -79,7 +79,7 @@ def process(client, auth):
     assert claim["has_work"]
     context = {key: claim[key] for key in ("run_key", "lease_token")}
     report = None
-    for stage in ("analyze", "publish", "notify", "complete"):
+    for stage in ("analyze", "enrich", "publish", "notify", "complete"):
         response = client.post("/internal/" + stage, json=context, headers=auth)
         assert response.status_code == 200, response.text
         if "report" in response.json():

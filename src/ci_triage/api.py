@@ -20,17 +20,20 @@ from .service import TriageService
 logger = logging.getLogger(__name__)
 
 
-def create_app(settings: Settings | None = None, database=None, github=None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, database=None, github=None, explainer=None
+) -> FastAPI:
     settings = settings or Settings()
     db = database or Database(settings.database_url)
     github = github or (DemoGitHub() if settings.triage_mode == "demo" else GitHub(settings))
-    service = TriageService(settings, db, github)
+    service = TriageService(settings, db, github, explainer)
 
     @asynccontextmanager
     async def lifespan(app):
         db.initialize()
         yield
         github.close()
+        service.explainer.close()
         db.engine.dispose()
 
     app = FastAPI(
@@ -154,6 +157,10 @@ def create_app(settings: Settings | None = None, database=None, github=None) -> 
     @app.post("/internal/analyze", dependencies=internal)
     def analyze(claim: Claim):
         return execute_stage("analyze", claim)
+
+    @app.post("/internal/enrich", dependencies=internal)
+    def enrich(claim: Claim):
+        return execute_stage("enrich", claim)
 
     @app.post("/internal/publish", dependencies=internal)
     def publish(claim: Claim):

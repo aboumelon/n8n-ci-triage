@@ -7,7 +7,7 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - `uv sync --locked`: dependency installation succeeded.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest`: 47 passed; 1 PostgreSQL integration test skipped locally.
+- `uv run pytest`: 94 passed; 2 PostgreSQL integration tests skipped locally.
 - `uv build`: source distribution and wheel built successfully.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
@@ -137,3 +137,38 @@ of the project's normal CI.
   idle pausing. Wake-up from a manual pause is already recorded above.
 - The acceptance tests do not establish GitHub delivery deadlines, provider quota
   behavior, or sustained production availability.
+
+## Optional LLM stage verification
+
+On 2026-10-15, the ten-node workflow was imported and published in a fresh real
+n8n 2.43.5 instance. A real local FastAPI server used temporary SQLite persistence;
+its injected HTTP client simulated the remote model provider. The workflow's only
+host adaptation was replacing `triage:8000` with the loopback API address.
+
+| Scenario | Simulated model response | Saved LLM status | Final run state |
+|---|---|---|---|
+| Test failure | HTTP 429 quota error | `fallback` | `done` |
+| Dependency failure | Valid structured explanation | `completed` | `done` |
+| Lint failure | Malformed completion JSON | `fallback` | `done` |
+| Repeated dependency failure | Valid structured explanation | `completed` | `done` |
+| Successful run | No model call | `skipped` | `done` |
+
+There were four simulated model calls for five runs. All publication and Telegram
+results in this local check were drafts. Valid explanations appeared in saved Issue
+Markdown and Telegram text. Duplicate webhook deliveries returned `duplicate`.
+An initial wake-up arrived before n8n registered the production webhook; the durable
+queue and scheduled recovery still completed that run.
+
+The automated suite additionally covers disabled/no-evidence behavior, bounded and
+redacted input, strict schema validation, mismatched finding indices, provider HTTP
+errors, timeouts, oversized bodies, markup/mention filtering, safe error metadata,
+cached results, immutable published reports, unchanged incident identity, publication
+and recovery with an enriched or fallback report, and retained notification links.
+The secret-entry helper has tests for private atomic updates, safe catalog errors,
+exact model selection, and redirect refusal. An additional PostgreSQL test exercises
+concurrent enrichment; it runs in GitHub CI when `TEST_DATABASE_URL` is provided.
+
+These are implementation and orchestration checks with a simulated provider.
+Apinex inference, account quota, response quality, and live AI-enriched Issue/Telegram
+delivery have not been verified. The operator must configure a key and run a new
+controlled failure using [the LLM setup guide](llm.md).

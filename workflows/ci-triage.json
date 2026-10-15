@@ -156,12 +156,43 @@
       "waitBetweenTries": 3000
     },
     {
+      "id": "2854071c-b9ed-5528-bf6a-f70c25dfb899",
+      "name": "Explain findings (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://triage:8000/internal/enrich",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_key: $json.run_key, lease_token: $json.lease_token }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ciTriageInternalKey",
+          "name": "CI Triage Internal API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
       "id": "2faf302c-b7f1-5c1c-b7ba-3e6004ff8af1",
       "name": "Publish or save draft",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        980,
+        1220,
         160
       ],
       "parameters": {
@@ -192,7 +223,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1220,
+        1460,
         160
       ],
       "parameters": {
@@ -223,7 +254,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1460,
+        1700,
         160
       ],
       "parameters": {
@@ -309,7 +340,7 @@
       "main": [
         [
           {
-            "node": "Publish or save draft",
+            "node": "Explain findings (LLM)",
             "type": "main",
             "index": 0
           }
@@ -343,6 +374,17 @@
         [
           {
             "node": "Claim run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explain findings (LLM)": {
+      "main": [
+        [
+          {
+            "node": "Publish or save draft",
             "type": "main",
             "index": 0
           }

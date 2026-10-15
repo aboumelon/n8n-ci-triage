@@ -57,7 +57,7 @@ def test_full_demo_pipeline_and_stage_order(client, settings, auth):
     claim = client.post("/internal/claim", headers=auth).json()
     assert client.post("/internal/publish", headers=auth, json=claim).status_code == 409
     assert client.post("/internal/complete", headers=auth, json=claim).status_code == 409
-    for stage in ("analyze", "publish", "notify", "complete"):
+    for stage in ("analyze", "enrich", "publish", "notify", "complete"):
         response = client.post("/internal/" + stage, headers=auth, json=claim)
         assert response.status_code == 200, response.text
     assert client.post("/internal/complete", headers=auth, json=claim).status_code == 200

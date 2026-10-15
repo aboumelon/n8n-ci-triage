@@ -27,7 +27,7 @@ if not claim["has_work"]:
     print("The queue is empty.")
 else:
     context = {name: claim[name] for name in ("run_key", "lease_token")}
-    for stage in ("analyze", "publish", "notify", "complete"):
+    for stage in ("analyze", "enrich", "publish", "notify", "complete"):
         result = post("/internal/" + stage, context)
         if stage == "notify":
             print(json.dumps(result["report"], indent=2))

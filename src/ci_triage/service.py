@@ -6,11 +6,13 @@ import sqlalchemy as sa
 from .analysis import analyze_log, markdown_report
 from .db import Conflict, incidents
 from .github import UpstreamError
+from .llm import Explainer, explanation_markdown
 
 
 class TriageService:
-    def __init__(self, settings, db, github):
+    def __init__(self, settings, db, github, explainer=None):
         self.settings, self.db, self.github = settings, db, github
+        self.explainer = explainer or Explainer(settings)
 
     @staticmethod
     def context(claim, **extra) -> dict:
@@ -76,6 +78,24 @@ class TriageService:
                 "run_url": run["run_url"],
                 "findings": findings,
             }
+            self.db.update(conn, run["key"], report=json.dumps(report), last_error=None)
+            return self.context(claim, report=report)
+
+    def enrich(self, claim) -> dict:
+        with self.db.transaction("run:" + claim.run_key) as conn:
+            run = self.db.leased_run(conn, claim)
+            if not run["report"]:
+                raise Conflict("Analyze the run before explanation")
+            report = json.loads(run["report"])
+            # Published reports are immutable. Old workflows can finish during an upgrade.
+            if "llm" in report or run["published"]:
+                return self.context(claim, report=report)
+            report["llm"] = self.explainer.explain(report)
+            if report["llm"]["status"] == "completed":
+                for insight in report["llm"]["findings"]:
+                    report["findings"][insight["finding_index"]]["markdown"] += (
+                        explanation_markdown(insight)
+                    )
             self.db.update(conn, run["key"], report=json.dumps(report), last_error=None)
             return self.context(claim, report=report)
 
@@ -219,6 +239,11 @@ class TriageService:
                 f"Workflow: {run['workflow_name']}",
                 f"Branch: {run['branch']}",
             ]
+            llm = report.get("llm", {})
+            if llm.get("status") == "completed":
+                lines.extend(["\nAI summary (hypothesis; review required):", llm["summary"]])
+                for insight in llm["findings"][:1]:
+                    lines.extend("Check: " + value for value in insight["next_steps"][:2])
             for finding in report["findings"]:
                 lines.extend(
                     [
@@ -227,11 +252,12 @@ class TriageService:
                         finding["evidence"],
                     ]
                 )
-            lines.append("\n" + run["run_url"])
+            links = [run["run_url"]]
             for action in report["publication"]["actions"]:
-                if action.get("issue_url"):
-                    lines.append(action["issue_url"])
-            text = "\n".join(lines)[:3_800]
+                if action.get("issue_url") and action["issue_url"] not in links and len(links) < 6:
+                    links.append(action["issue_url"])
+            suffix = "\n\n" + "\n".join(links)
+            text = "\n".join(lines)[: 3_800 - len(suffix)] + suffix
             enabled = bool(self.settings.telegram_bot_token.get_secret_value())
             if enabled:
                 try:

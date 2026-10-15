@@ -71,6 +71,8 @@ def main():
         parser.error("This check requires TRIAGE_MODE=demo and PUBLISH_MODE=draft")
     if env.get("TELEGRAM_BOT_TOKEN"):
         parser.error("Disable Telegram delivery before running this draft-only demo check")
+    if env.get("LLM_ENABLED", "false").lower() in {"1", "true", "yes", "on"}:
+        parser.error("Disable LLM calls before running this account-free demo check")
     if not env.get("WEBHOOK_SECRET") or not env.get("INTERNAL_API_KEY"):
         parser.error("Generate .env with scripts/configure.py first")
 
