@@ -54,7 +54,7 @@ def validate_options(base_url: str, model: str):
         raise SetupError("Choose a model ID beginning with free/ from the provider's catalog.")
 
 
-def verify_catalog(base_url: str, model: str, token: str):
+def fetch_catalog(base_url: str, token: str) -> dict:
     request = urllib.request.Request(
         base_url.rstrip("/") + "/models",
         headers={
@@ -98,11 +98,52 @@ def verify_catalog(base_url: str, model: str, token: str):
         raise SetupError("Cannot read the model catalog; check the key and connectivity.") from None
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
         raise SetupError("Invalid model catalog; settings were not changed.")
-    available = {
+    return {
         item["id"]: item
         for item in payload["data"]
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     }
+
+
+def catalog_summary(available: dict, token: str) -> list[dict]:
+    def flag(item, name):
+        if name not in item:
+            return "missing"
+        value = item[name]
+        if type(value) is bool:
+            return value
+        return "type:" + type(value).__name__
+
+    result = []
+    for name, item in list(available.items())[:50]:
+        safe_name = (
+            name
+            if re.fullmatch(r"[A-Za-z0-9/._-]{1,120}", name) and token not in name
+            else "[redacted]"
+        )
+        row = {"id": safe_name}
+        for field in ("free", "json_output", "structured_outputs"):
+            row[field] = flag(item, field)
+        parameters = item.get("supported_parameters")
+        if isinstance(parameters, list):
+            row["supported_parameters"] = [
+                value
+                for value in ("response_format", "max_tokens", "stream")
+                if value in parameters
+            ]
+        providers = item.get("providers")
+        if isinstance(providers, list):
+            row["provider_flags"] = [
+                {field: flag(provider, field) for field in ("free", "json_output")}
+                for provider in providers[:3]
+                if isinstance(provider, dict)
+            ]
+        result.append(row)
+    return result
+
+
+def verify_catalog(base_url: str, model: str, token: str):
+    available = fetch_catalog(base_url, token)
     if model not in available:
         pattern = (
             r"[A-Za-z0-9][A-Za-z0-9._-]{0,100}"
@@ -127,7 +168,10 @@ def verify_catalog(base_url: str, model: str, token: str):
     ):
         raise SetupError(
             "AMD's catalog must mark the selected model free=true and json_output=true; "
-            "settings were not changed."
+            "settings were not changed.\n"
+            + json.dumps(catalog_summary({model: available[model]}, token), indent=2)
+            + "\nInspect all models: "
+            "python3 scripts/configure_llm.py --provider amd --list-models"
         )
 
 
@@ -162,6 +206,11 @@ def main(argv=None):
     parser.add_argument("--provider", choices=("apinex", "amd"), default="apinex")
     parser.add_argument("--base-url")
     parser.add_argument("--model")
+    parser.add_argument(
+        "--list-models",
+        action="store_true",
+        help="Print model IDs and capability flags without changing settings or running inference",
+    )
     args = parser.parse_args(argv)
     args.base_url = args.base_url or (AMD_BASE_URL if args.provider == "amd" else DEFAULT_BASE_URL)
     args.model = args.model or (AMD_MODEL if args.provider == "amd" else DEFAULT_MODEL)
@@ -177,6 +226,13 @@ def main(argv=None):
         raise SetupError("Use an interactive terminal so the key remains hidden.") from None
     if not re.fullmatch(r"[A-Za-z0-9._-]{16,256}", token):
         raise SetupError("Invalid API key format; settings were not changed.")
+    if args.list_models:
+        print(
+            json.dumps(
+                {"models": catalog_summary(fetch_catalog(args.base_url, token), token)}, indent=2
+            )
+        )
+        return
     verify_catalog(args.base_url, args.model, token)
     save_settings(path, args.base_url, args.model, token)
     print(f"Saved LLM settings for {args.model}. The key was not displayed.")

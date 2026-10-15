@@ -41,6 +41,19 @@ explicitly, for example:
 python3 scripts/configure_llm.py --provider amd --model DeepSeek-V4-Flash
 ```
 
+If the capability check fails, inspect what the live catalog actually provides:
+
+```bash
+python3 scripts/configure_llm.py --provider amd --list-models
+```
+
+Enter the AMD key at the hidden prompt. This mode performs only a catalog GET;
+it does not save the key, change `.env`, or call a model. Output is limited to
+model IDs, selected capability flags, supported parameter names, and provider flags.
+Missing flags are shown as `missing`, explicit negative flags as `false`, and
+unexpected flag types as `type:...`. Unknown metadata and credentials are omitted.
+Do not interpret a missing flag as proof of either free access or lack of support.
+
 The helper preserves GitHub/Telegram settings, sets the HTTP timeout to 30 seconds,
 and never launches a GPU instance or chooses a dedicated endpoint. The existing
 Python client already speaks the required chat/JSON format. No new n8n credential,

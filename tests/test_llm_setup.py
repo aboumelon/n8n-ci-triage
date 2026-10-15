@@ -198,3 +198,37 @@ def test_missing_amd_model_lists_only_free_json_capable_alternatives(setup, monk
         setup.verify_catalog(setup.AMD_BASE_URL, "MiniCPM5-2B", "private-key")
     assert "DeepSeek-V4-Flash" in str(error.value)
     assert "Paid-Model" not in str(error.value) and "No-JSON" not in str(error.value)
+
+
+def test_catalog_summary_distinguishes_missing_false_and_wrong_types_without_secrets(setup):
+    key = "rc-" + "a" * 48
+    data = {
+        "MiniCPM5-2B": {"free": True, "json_output": False, "unknown": key},
+        "Missing": {"supported_parameters": ["response_format", key]},
+        "Wrong-Type": {"free": key, "json_output": "true"},
+        key: {"free": True, "json_output": True},
+    }
+    summary = setup.catalog_summary(data, key)
+    assert summary[0]["json_output"] is False and summary[0]["structured_outputs"] == "missing"
+    assert summary[1]["free"] == "missing"
+    assert summary[1]["supported_parameters"] == ["response_format"]
+    assert summary[2]["free"] == "type:str" and summary[3]["id"] == "[redacted]"
+    assert key not in json.dumps(summary) and "unknown" not in json.dumps(summary)
+
+
+def test_list_models_does_not_save_credentials_or_call_inference(
+    setup, monkeypatch, tmp_path, capsys
+):
+    path = tmp_path / ".env"
+    original = "GITHUB_TOKEN=unchanged\nLLM_BASE_URL=https://api.apinex.bond/v1\n"
+    path.write_text(original)
+    key = "rc-" + "a" * 48
+    monkeypatch.setattr(setup, "ROOT", tmp_path)
+    monkeypatch.setattr(setup.getpass, "getpass", lambda _: key)
+    monkeypatch.setattr(setup, "fetch_catalog", lambda *_: {"MiniCPM5-2B": {"free": True}})
+    monkeypatch.setattr(setup, "verify_catalog", lambda *_: pytest.fail("Not a setup operation"))
+    monkeypatch.setattr(setup, "save_settings", lambda *_: pytest.fail("Must not save settings"))
+    setup.main(["--provider", "amd", "--list-models"])
+    output = capsys.readouterr().out
+    assert json.loads(output)["models"][0]["json_output"] == "missing"
+    assert key not in output and path.read_text() == original

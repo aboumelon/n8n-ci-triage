@@ -7,7 +7,7 @@ Validated locally on 2026-10-15 with Python 3.12.14, uv 0.12.23, and n8n 2.43.5.
 - `uv sync --locked`: dependency installation succeeded.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest`: 119 passed; 2 PostgreSQL integration tests skipped locally.
+- `uv run pytest`: 121 passed; 2 PostgreSQL integration tests skipped locally.
 - `uv build`: source distribution and wheel built successfully.
 - Freestyle SDK 0.2.20 installed from the frozen pnpm lockfile; provisioning script
   syntax checked and SDK option names checked against its installed type definitions.
@@ -197,3 +197,10 @@ model ID, system/user message shape, and JSON response validation with a simulat
 provider. Radeon key-format redaction and omission of AMD-style reasoning fields
 are also covered. Live AMD credentials, explanation quality, and delivery of an
 AMD-generated report remain operator acceptance checks.
+
+An operator-supplied setup screenshot subsequently showed that `MiniCPM5-2B`
+was found but did not pass the expected top-level free/JSON flag checks. That
+message alone does not establish whether flags were absent, negative, or differently
+typed. The diagnostic catalog mode is tested to distinguish these cases while
+omitting secrets and leaving existing settings untouched. The guard remains in
+place until actual catalog metadata is inspected.
