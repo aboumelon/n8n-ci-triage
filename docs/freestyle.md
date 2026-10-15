@@ -53,6 +53,11 @@ Names are first-come-first-served; choose a different prefix if either name is t
 
 ## Install the application inside the VM
 
+If you already created a VM in the dashboard, reuse it. You can run the application
+installation in its **Terminal** without signing into Freestyle from another browser
+or placing a Freestyle API key on the VM. The HTTPS routing rules still need to be
+created separately in the dashboard or from an authenticated Freestyle CLI/SDK.
+
 Open the VM terminal in the dashboard, or use the Freestyle CLI:
 
 ```bash
@@ -65,10 +70,11 @@ Inside the VM:
 ```bash
 git clone https://github.com/aboumelon/n8n-ci-triage.git
 cd n8n-ci-triage
-python3 scripts/configure.py
+python3 scripts/configure.py --public-url https://ci-armin-n8n.style.dev
 ```
 
-Edit the generated `.env`. For the example prefix, set:
+Replace the hostname with your chosen n8n hostname. This generates secrets on the VM
+and sets the following proxy configuration, without printing or overwriting secrets:
 
 ```dotenv
 HOST_BIND=0.0.0.0
@@ -83,6 +89,18 @@ Compose network. Keep demo mode for the first check, then:
 
 ```bash
 docker compose up -d --build
+```
+
+On a VM where Docker requires root privileges, prefix Compose commands with `sudo`,
+and use `sudo python3 scripts/bootstrap_n8n.py` for the import step. Do not make the
+Docker socket world-writable.
+
+Confirm local readiness before debugging public routes:
+
+```bash
+sudo docker compose ps
+curl --fail http://127.0.0.1:8000/healthz
+curl --fail http://127.0.0.1:5678/healthz
 ```
 
 1. Open the n8n HTTPS address and create the owner account promptly.
