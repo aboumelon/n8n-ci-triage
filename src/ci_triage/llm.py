@@ -123,6 +123,8 @@ class Explainer:
                 headers={
                     "Authorization": "Bearer " + self.settings.llm_api_key.get_secret_value(),
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "User-Agent": "n8n-ci-triage/0.1",
                 },
                 json={
                     "model": self.settings.llm_model,

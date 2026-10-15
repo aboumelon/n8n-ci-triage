@@ -59,6 +59,8 @@ def test_catalog_requires_exact_selected_model_and_does_not_follow_redirects(set
     with pytest.raises(setup.SetupError, match="not in your authenticated catalog"):
         setup.verify_catalog(setup.DEFAULT_BASE_URL, setup.DEFAULT_MODEL, "private-token")
     assert len(calls) == 1 and calls[0].get_header("Authorization") == "Bearer private-token"
+    assert calls[0].get_header("User-agent") == "n8n-ci-triage/0.1"
+    assert calls[0].get_header("Accept") == "application/json"
     assert calls[0].full_url.endswith("/v1/models")
 
 
@@ -78,3 +80,40 @@ def test_failed_verification_does_not_change_env_or_echo_key(setup, monkeypatch,
         setup.main([])
     assert path.read_text() == original
     assert "private-token-value" not in str(error.value) + capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body", "expected"),
+    [
+        ("text/plain; charset=UTF-8", b"error code: 1010", "web access denial"),
+        ("text/html", b"Forbidden", "web access denial"),
+        (
+            "application/json",
+            b'{"error":{"type":"authentication_error"}}',
+            "account/model permissions",
+        ),
+        (
+            "application/json",
+            b'{"type":"https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/"}',
+            "web access denial",
+        ),
+    ],
+)
+def test_forbidden_diagnostics_distinguish_web_denial_from_api_errors(
+    setup, monkeypatch, content_type, body, expected
+):
+    class Opener:
+        def open(self, request, timeout):
+            error = urllib.error.HTTPError(
+                request.full_url,
+                403,
+                "Forbidden private-token",
+                {"Content-Type": content_type},
+                io.BytesIO(body + b"private-token and untrusted response details"),
+            )
+            raise error
+
+    monkeypatch.setattr(setup.urllib.request, "build_opener", lambda _: Opener())
+    with pytest.raises(setup.SetupError, match=expected) as error:
+        setup.verify_catalog(setup.DEFAULT_BASE_URL, setup.DEFAULT_MODEL, "private-token")
+    assert "private-token" not in str(error.value)

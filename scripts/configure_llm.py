@@ -47,7 +47,12 @@ def validate_options(base_url: str, model: str):
 
 def verify_catalog(base_url: str, model: str, token: str):
     request = urllib.request.Request(
-        base_url.rstrip("/") + "/models", headers={"Authorization": "Bearer " + token}
+        base_url.rstrip("/") + "/models",
+        headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/json",
+            "User-Agent": "n8n-ci-triage/0.1",
+        },
     )
     try:
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
@@ -58,9 +63,28 @@ def verify_catalog(base_url: str, model: str, token: str):
                 )
             payload = json.loads(raw)
     except urllib.error.HTTPError as exc:
-        raise SetupError(
-            f"Model catalog request failed (HTTP {exc.code}); settings unchanged."
-        ) from None
+        message = f"Model catalog request failed (HTTP {exc.code}); settings unchanged."
+        # Do not display error bodies: upstreams may echo credentials or request details.
+        content_type = exc.headers.get("Content-Type", "").split(";", 1)[0].lower()
+        try:
+            error_body = exc.read(4_096).lower()
+        except (OSError, http.client.HTTPException):
+            error_body = b""
+        edge_denial = (
+            content_type in {"text/html", "text/plain"}
+            or b"cloudflare-1xxx-errors/error-1010" in error_body
+            or b"error code: 1010" in error_body
+        )
+        if exc.code == 403 and edge_denial:
+            message += (
+                " The response indicates a provider edge/web access denial. "
+                "Ask the provider whether requests from this VM are allowed."
+            )
+        elif exc.code in {401, 403}:
+            message += (
+                " Check the API key and its account/model permissions in the provider dashboard."
+            )
+        raise SetupError(message) from None
     except (OSError, http.client.HTTPException, ValueError):
         raise SetupError("Cannot read the model catalog; check the key and connectivity.") from None
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):

@@ -37,6 +37,23 @@ free aliases and leaves `.env` unchanged. Select one explicitly:
 python3 scripts/configure_llm.py --model free/glm-5.3-flash
 ```
 
+If setup returns HTTP 403 before saving anything, first update the checkout and retry:
+
+```bash
+git pull --ff-only
+python3 scripts/configure_llm.py
+```
+
+The setup helper and inference client identify themselves as `n8n-ci-triage/0.1`
+and request JSON. A provider edge rejected the default Python urllib client with
+HTTP 403 / Cloudflare 1010 during an unauthenticated connectivity check; an explicit
+application User-Agent reached the API's normal missing-key response instead.
+This does not establish that an operator's key or VM IP is authorized. The helper
+recognizes plain-text/HTML access denials and Cloudflare 1010 JSON error documents
+without displaying response bodies or secrets. A persistent web denial needs
+provider-side review of the VM's access; an API authentication error needs review
+of the key and account permissions.
+
 The helper only accepts `free/` aliases. Direct configuration supports other
 OpenAI-compatible providers with these settings:
 

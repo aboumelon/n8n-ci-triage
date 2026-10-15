@@ -85,6 +85,8 @@ def test_input_is_bounded_redacted_and_excludes_repository_metadata(enabled, rep
         requests.append(request)
         data = json.loads(request.content)
         assert request.headers["Authorization"] == "Bearer " + KEY
+        assert request.headers["User-Agent"] == "n8n-ci-triage/0.1"
+        assert request.headers["Accept"] == "application/json"
         assert str(request.url) == "https://api.apinex.bond/v1/chat/completions"
         assert data["model"].startswith("free/")
         assert data["max_tokens"] == 1_200 and data["stream"] is False
